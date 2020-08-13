@@ -2,7 +2,7 @@ MACOS_TARGET_VERSION ?= 10.15.6
 PKG_IDENTIFIER ?= io.balena.automac
 AUTOMAC_VERSION ?= $(shell cat VERSION)
 
-.PHONY: fetch-installer lint clean
+.PHONY: fetch-installer lint
 
 fetch-installer:
 	/usr/sbin/softwareupdate \
@@ -12,13 +12,7 @@ fetch-installer:
 lint:
 	shellcheck scripts/*
 
-clean:
-	rm -rf build
-
-build:
-	mkdir -p $@
-
-build/automac-component.pkg: scripts/preinstall scripts/postinstall | build
+automac-component.pkg: scripts/preinstall scripts/postinstall
 	pkgbuild \
 		--nopayload \
 		--scripts scripts \
@@ -29,5 +23,5 @@ build/automac-component.pkg: scripts/preinstall scripts/postinstall | build
 
 # "startosinstall" install packages myst be distribution-style flat packages
 # See https://github.com/munki/createOSXinstallPkg#further-note-on-additional-packages-and-yosemite-and-el-capitan
-build/automac-distribution.pkg: build/automac-component.pkg
+automac-distribution.pkg: automac-component.pkg
 	productbuild --package $< $@
