@@ -21,4 +21,5 @@ fi
 "$INSTALLER/Contents/Resources/startosinstall" \
    --nointeraction \
    --volume "$ARGV_VOLUME" \
-   --agreetolicense
+   --agreetolicense \
+   --installpackage ./automac-distribution.pkg

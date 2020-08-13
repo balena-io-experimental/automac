@@ -3,3 +3,13 @@
 set -eu
 
 echo "> POST INSTALL HOOK"
+
+USER="automac"
+
+echo "> Creating user $USER"
+
+dscl . -create "/Users/$USER"
+dscl . -create "/Users/$USER" UserShell /bin/bash
+dscl . -create "/Users/$USER" RealName "Automac"
+dscl . -passwd "/Users/$USER" "$USER"
+dscl . -append /Groups/admin GroupMembership "$USER"
