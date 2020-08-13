@@ -6,6 +6,10 @@ echo "> POST INSTALL HOOK"
 
 USER="automac"
 
+echo "> Set the primary language for the system"
+
+languagesetup -langspec en
+
 echo "> Creating user $USER"
 
 dscl . -create "/Users/$USER"
