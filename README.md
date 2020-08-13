@@ -1,0 +1,2 @@
+# automac
+Unattended macOS installations
