@@ -17,6 +17,9 @@ dscl . -create "/Users/$USER" UserShell /bin/bash
 dscl . -create "/Users/$USER" RealName "Automac"
 dscl . -create "/Users/$USER" UniqueID 503
 dscl . -create "/Users/$USER" PrimaryGroupID 503
-dscl . -create "/Users/$USER" NFSHomeDirectory "/Local/Users/$USER"
+dscl . -create "/Users/$USER" NFSHomeDirectory "/Users/$USER"
 dscl . -passwd "/Users/$USER" "$USER"
 dscl . -append /Groups/admin GroupMembership "$USER"
+mkdir -p "/Users/$USER"
+
+touch /var/db/.AppleSetupDone
