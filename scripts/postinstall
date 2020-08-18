@@ -38,7 +38,7 @@ if [[ ${osvers} -ge 7 ]]; then
   for USER_TEMPLATE in "/System/Library/User Template"/*
   do
     # Not writable
-    if [ "$USER_TEMPLATE" = "__permissions.plist" ]
+    if [ "$(basename "$USER_TEMPLATE")" = "__permissions.plist" ]
     then
       continue
     fi
