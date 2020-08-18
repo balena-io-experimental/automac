@@ -35,9 +35,14 @@ sw_build=$(sw_vers -buildVersion)
 # to be disabled.
 
 if [[ ${osvers} -ge 7 ]]; then
-
- for USER_TEMPLATE in "/System/Library/User Template"/*
+  for USER_TEMPLATE in "/System/Library/User Template"/*
   do
+    # Not writable
+    if [ "$USER_TEMPLATE" = "__permissions.plist" ]
+    then
+      continue
+    fi
+
     /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant DidSeeCloudSetup -bool TRUE
     /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant DidSeeAppearanceSetup -bool TRUE
     /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant DidSeePrivacy -bool TRUE
@@ -53,14 +58,14 @@ if [[ ${osvers} -ge 7 ]]; then
     /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant LastSeenBuddyBuildVersion "${sw_build}"      
   done
   
- # Checks first to see if the Mac is running 10.7.0 or higher.
- # If so, the script checks the existing user folders in /Users
- # for the presence of the Library/Preferences directory.
- #
- # If the directory is not found, it is created and then the
- # iCloud and Diagnostic pop-up settings are set to be disabled.
+  # Checks first to see if the Mac is running 10.7.0 or higher.
+  # If so, the script checks the existing user folders in /Users
+  # for the presence of the Library/Preferences directory.
+  #
+  # If the directory is not found, it is created and then the
+  # iCloud and Diagnostic pop-up settings are set to be disabled.
 
- for USER_HOME in /Users/*
+  for USER_HOME in /Users/*
   do
     USER_UID="$(basename "${USER_HOME}")"
     if [ ! "${USER_UID}" = "Shared" ]; then
