@@ -45,6 +45,9 @@ if [[ ${osvers} -ge 7 ]]; then
     /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant DidSeeSiriSetup -bool TRUE
     /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant DidSeeiCloudLoginForStorageServices -bool TRUE
 
+    /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant ShowKeychainSyncBuddyAtLogin -bool FALSE
+    /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant RunNonInteractive -bool TRUE
+
     /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant GestureMovieSeen none
     /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant LastSeenCloudProductVersion "${sw_vers}"
     /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant LastSeenBuddyBuildVersion "${sw_build}"      
@@ -74,6 +77,9 @@ if [[ ${osvers} -ge 7 ]]; then
         /usr/bin/defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant DidSeeSiriSetup -bool TRUE
         /usr/bin/defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant DidSeeiCloudLoginForStorageServices -bool TRUE
 
+        /usr/bin/defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant ShowKeychainSyncBuddyAtLogin -bool FALSE
+        /usr/bin/defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant RunNonInteractive -bool TRUE
+
         /usr/bin/defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant GestureMovieSeen none
         /usr/bin/defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant LastSeenCloudProductVersion "${sw_vers}"
         /usr/bin/defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant LastSeenBuddyBuildVersion "${sw_build}"
@@ -86,6 +92,7 @@ fi
 KEYCHAIN="login"
 
 # See https://www.intego.com/mac-security-blog/create-a-non-login-keychain/
-security create-keychain -p "$USER" "$KEYCHAIN"
-security default-keychain -d system -s "$KEYCHAIN"
-security login-keychain -d system -s "$KEYCHAIN"
+su - "$USER" -c "security create-keychain -p "$USER" "$KEYCHAIN""
+# su - "$USER" -c "security unlock-keychain -p "$USER" "$KEYCHAIN""
+su - "$USER" -c "security default-keychain -d user -s "$KEYCHAIN""
+su - "$USER" -c "security login-keychain -d user -s "$KEYCHAIN""
