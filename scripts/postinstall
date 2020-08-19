@@ -72,6 +72,7 @@ if [[ ${osvers} -ge 7 ]]; then
       # Opening a terminal throws otherwise, as it tries to `touch` 
       # a file inside this directory
       /bin/mkdir -p "${USER_HOME}"/.bash_sessions
+      /usr/sbin/chown "${USER_UID}" "${USER_HOME}"/.bash_sessions
 
       if [ ! -d "${USER_HOME}"/Library/Preferences ]; then
         /bin/mkdir -p "${USER_HOME}"/Library/Preferences
@@ -99,4 +100,4 @@ if [[ ${osvers} -ge 7 ]]; then
 fi
 
 # See https://www.intego.com/mac-security-blog/create-a-non-login-keychain/
-su - "$USER" -c "security create-keychain -p "$USER" login
+su - "$USER" -c "security create-keychain -p "$USER" login"
