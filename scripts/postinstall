@@ -98,10 +98,5 @@ if [[ ${osvers} -ge 7 ]]; then
   done
 fi
 
-KEYCHAIN="login"
-
 # See https://www.intego.com/mac-security-blog/create-a-non-login-keychain/
-su - "$USER" -c "security create-keychain -p "$USER" "$KEYCHAIN""
-# su - "$USER" -c "security unlock-keychain -p "$USER" "$KEYCHAIN""
-su - "$USER" -c "security default-keychain -d user -s "$KEYCHAIN""
-su - "$USER" -c "security login-keychain -d user -s "$KEYCHAIN""
+su - "$USER" -c "security create-keychain -p "$USER" login
