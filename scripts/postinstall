@@ -1,32 +1,81 @@
 #!/bin/sh
 
+# From https://derflounder.wordpress.com/2014/10/16/disabling-the-icloud-and-diagnostics-pop-up-windows-in-yosemite/
+# https://github.com/timsutton/osx-vm-templates
+# https://github.com/xfreebird/kcpassword
+
 set -eux
 
-USER="automac"
+USER='balena'
+USER_PIC='/Library/User Pictures/Nature/Cactus.tif'
+AUTHORIZED_KEY='ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHFELRt40YYIcuP0UoJg3bcwGudF4FSrYrGLVoRFjsq9 ansible@product-os.io'
+
+install_homebrew() {
+    curl --retry 3 -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh > /tmp/install.sh \
+      && chmod +x /tmp/install.sh \
+      && su - "${USER}" -c 'CI=1 /tmp/install.sh' \
+      && rm /tmp/install.sh \
+      && su - "${USER}" -c '/usr/local/bin/brew tap xfreebird/utils' \
+      && chown -R "${USER}" "/Users/${USER}/Library" \
+      && su - "${USER}" -c '/usr/local/bin/brew install kcpassword'
+}
+
+# https://developer.apple.com/library/archive/technotes/tn2459/_index.html
+spctl kext-consent disable
 
 languagesetup -langspec en
 
-dscl . -create "/Users/$USER"
-dscl . -create "/Users/$USER" UserShell /bin/bash
-dscl . -create "/Users/$USER" RealName "Automac"
-dscl . -create "/Users/$USER" UniqueID 503
-dscl . -create "/Users/$USER" PrimaryGroupID 503
-dscl . -create "/Users/$USER" NFSHomeDirectory "/Users/$USER"
-dscl . -passwd "/Users/$USER" "$USER"
-dscl . -append /Groups/admin GroupMembership "$USER"
-mkdir -p "/Users/$USER"
+dscl . -create "/Users/${USER}"
+dscl . -create "/Users/${USER}" UserShell /bin/bash
+dscl . -create "/Users/${USER}" RealName "${USER}"
+dscl . -create "/Users/${USER}" UniqueID 503
+dscl . -create "/Users/${USER}" PrimaryGroupID 503
+dscl . -create "/Users/${USER}" NFSHomeDirectory "/Users/${USER}"
+dscl . -create "/Users/${USER}" Picture "${USER_PIC}"
+dscl . -passwd "/Users/${USER}" "${USER}"
+dscl . -append /Groups/admin GroupMembership "${USER}"
 
-touch /var/db/.AppleSetupDone
+mkdir -p "/Users/${USER}/.ssh"
+echo "${AUTHORIZED_KEY}" > "/Users/${USER}/.ssh/authorized_keys"
 
-# From https://derflounder.wordpress.com/2014/10/16/disabling-the-icloud-and-diagnostics-pop-up-windows-in-yosemite/
+echo "${USER} ALL=(ALL) NOPASSWD: ALL" > "/etc/sudoers.d/${USER}"
+
+# Install Homebrew
+for i in $(seq 1 3); do [ "$i" -gt 1 ] && sleep 15; install_homebrew && s=0 && break || s=$?; done; (exit $s)
+
+# Automatically login user
+/usr/local/bin/kcpassword "${USER}"
+defaults write /Library/Preferences/com.apple.loginwindow autoLoginUser "${USER}"
+
+# Set default keyboard layout
+defaults write /Library/Preferences/com.apple.keyboardtype "keyboardtype" -dict-add "1-1575-0" -int 40
 
 # Determine OS version
 osvers=$(sw_vers -productVersion | awk -F. '{print $2}')
 sw_vers=$(sw_vers -productVersion)
 
 # Determine OS build number
-
 sw_build=$(sw_vers -buildVersion)
+
+# Enable OpenSSH and Screen Sharing (VNC)
+if [ "${osvers}" -ge 10 ]; then
+    plist='/private/var/db/com.apple.xpc.launchd/disabled.plist'
+    /usr/libexec/PlistBuddy -c 'Delete :com.openssh.sshd' "${plist}" || true
+    /usr/libexec/PlistBuddy -c 'Add :com.openssh.sshd bool False' "${plist}" || true
+    /usr/libexec/PlistBuddy -c 'Delete :com.apple.screensharing' "${plist}" || true
+    /usr/libexec/PlistBuddy -c 'Add :com.apple.screensharing bool False' "${plist}" || true
+else
+    plist='/private/var/db/launchd.db/com.apple.launchd/overrides.plist'
+    /usr/libexec/PlistBuddy -c 'Delete :com.openssh.sshd' "${plist}" || true
+    /usr/libexec/PlistBuddy -c 'Add :com.openssh.sshd:Disabled bool False' "${plist}" || true
+    /usr/libexec/PlistBuddy -c 'Delete :com.apple.screensharing' "${plist}" || true
+    /usr/libexec/PlistBuddy -c 'Add :com.apple.screensharing:Disabled bool False' "${plist}" || true
+fi
+launchctl load -w /System/Library/LaunchDaemons/ssh.plist || true
+launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist || true
+
+# Disable loginwindow screensaver to save CPU cycles
+/usr/libexec/PlistBuddy -c 'Add :loginWindowIdleTime integer 0' /Library/Preferences/com.apple.screensaver.plist || true
 
 # Checks first to see if the Mac is running 10.7.0 or higher. 
 # If so, the script checks the system default user template
@@ -34,27 +83,26 @@ sw_build=$(sw_vers -buildVersion)
 # found, the iCloud and Diagnostic pop-up settings are set 
 # to be disabled.
 
-if [[ ${osvers} -ge 7 ]]; then
-  for USER_TEMPLATE in "/System/Library/User Template"/*
+if [ "${osvers}" -ge 7 ]; then
+  for USER_TEMPLATE in /System/Library/User\ Template/*
   do
-    if [ ! -d "$USER_TEMPLATE" ]
+    if [ ! -d "${USER}_TEMPLATE" ]
     then
       continue
     fi
-
-    /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant DidSeeCloudSetup -bool TRUE
-    /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant DidSeeAppearanceSetup -bool TRUE
-    /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant DidSeePrivacy -bool TRUE
-    /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant DidSeeScreenTime -bool TRUE
-    /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant DidSeeSiriSetup -bool TRUE
-    /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant DidSeeiCloudLoginForStorageServices -bool TRUE
-
-    /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant ShowKeychainSyncBuddyAtLogin -bool FALSE
-    /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant RunNonInteractive -bool TRUE
-
-    /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant GestureMovieSeen none
-    /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant LastSeenCloudProductVersion "${sw_vers}"
-    /usr/bin/defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant LastSeenBuddyBuildVersion "${sw_build}"      
+    defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant DidSeeCloudSetup -bool TRUE
+    defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant DidSeeAppearanceSetup -bool TRUE
+    defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant DidSeePrivacy -bool TRUE
+    defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant DidSeeScreenTime -bool TRUE
+    defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant DidSeeSiriSetup -bool TRUE
+    defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant DidSeeiCloudLoginForStorageServices -bool TRUE
+    defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant ShowKeychainSyncBuddyAtLogin -bool FALSE
+    defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant RunNonInteractive -bool TRUE
+    defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant GestureMovieSeen none
+    defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant LastSeenCloudProductVersion "${sw_vers}"
+    defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.SetupAssistant LastSeenBuddyBuildVersion "${sw_build}" 
+    # default: z right of LSHIFT : ? left of RSHIFT
+    defaults write "${USER_TEMPLATE}"/Library/Preferences/com.apple.keyboardtype 'keyboardtype' -dict-add '1-1575-0' -int 40
   done
   
   # Checks first to see if the Mac is running 10.7.0 or higher.
@@ -67,37 +115,42 @@ if [[ ${osvers} -ge 7 ]]; then
   for USER_HOME in /Users/*
   do
     USER_UID="$(basename "${USER_HOME}")"
-    if [ ! "${USER_UID}" = "Shared" ]; then
+    if [ ! "${USER_UID}" = 'Shared' ]; then
 
       # Opening a terminal throws otherwise, as it tries to `touch` 
       # a file inside this directory
-      /bin/mkdir -p "${USER_HOME}"/.bash_sessions
-      /usr/sbin/chown "${USER_UID}" "${USER_HOME}"/.bash_sessions
+      mkdir -p "${USER_HOME}/.bash_sessions"
+      chown "${USER_UID}" "${USER_HOME}/.bash_sessions"
 
-      if [ ! -d "${USER_HOME}"/Library/Preferences ]; then
-        /bin/mkdir -p "${USER_HOME}"/Library/Preferences
-        /usr/sbin/chown "${USER_UID}" "${USER_HOME}"/Library
-        /usr/sbin/chown "${USER_UID}" "${USER_HOME}"/Library/Preferences
+      if [ ! -d "${USER_HOME}/Library/Preferences" ]; then
+        mkdir -p "${USER_HOME}/Library/Preferences"
+        chown "${USER_UID}" "${USER_HOME}/Library"
+        chown "${USER_UID}" "${USER_HOME}/Library/Preferences"
       fi
-      if [ -d "${USER_HOME}"/Library/Preferences ]; then
-        /usr/bin/defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant DidSeeCloudSetup -bool TRUE
-        /usr/bin/defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant DidSeeAppearanceSetup -bool TRUE
-        /usr/bin/defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant DidSeePrivacy -bool TRUE
-        /usr/bin/defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant DidSeeScreenTime -bool TRUE
-        /usr/bin/defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant DidSeeSiriSetup -bool TRUE
-        /usr/bin/defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant DidSeeiCloudLoginForStorageServices -bool TRUE
-
-        /usr/bin/defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant ShowKeychainSyncBuddyAtLogin -bool FALSE
-        /usr/bin/defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant RunNonInteractive -bool TRUE
-
-        /usr/bin/defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant GestureMovieSeen none
-        /usr/bin/defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant LastSeenCloudProductVersion "${sw_vers}"
-        /usr/bin/defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant LastSeenBuddyBuildVersion "${sw_build}"
-        /usr/sbin/chown "${USER_UID}" "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant.plist
+      if [ -d "${USER_HOME}/Library/Preferences" ]; then
+        defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant DidSeeCloudSetup -bool TRUE
+        defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant DidSeeAppearanceSetup -bool TRUE
+        defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant DidSeePrivacy -bool TRUE
+        defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant DidSeeScreenTime -bool TRUE
+        defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant DidSeeSiriSetup -bool TRUE
+        defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant DidSeeiCloudLoginForStorageServices -bool TRUE
+        defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant ShowKeychainSyncBuddyAtLogin -bool FALSE
+        defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant RunNonInteractive -bool TRUE
+        defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant GestureMovieSeen none
+        defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant LastSeenCloudProductVersion "${sw_vers}"
+        defaults write "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant LastSeenBuddyBuildVersion "${sw_build}"
+        # default: z right of LSHIFT : ? left of RSHIFT
+        defaults write "${USER_HOME}"/Library/Preferences/com.apple.keyboardtype 'keyboardtype' -dict-add '1-1575-0' -int 40
+        chown "${USER_UID}" "${USER_HOME}"/Library/Preferences/com.apple.SetupAssistant.plist
       fi
     fi
   done
 fi
 
-# See https://www.intego.com/mac-security-blog/create-a-non-login-keychain/
-su - "$USER" -c "security create-keychain -p "$USER" login"
+# Fix ownership
+chown -R "${USER}" "/Users/${USER}"
+
+# Create Ansible identifier
+mkdir -p '/etc/balena' && touch '/etc/balena/.balenaci-worker'
+
+touch '/var/db/.AppleSetupDone'
